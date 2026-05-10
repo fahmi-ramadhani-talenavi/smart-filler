@@ -1,0 +1,57 @@
+name: Release Extension
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Get version from manifest
+        id: manifest_version
+        run: |
+          VERSION=$(grep '"version"' manifest.json | head -1 | awk -F'"' '{print $4}')
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Package Extension
+        run: |
+          zip -r smart-filler-v${{ env.VERSION }}.zip \
+            manifest.json \
+            content.js \
+            background.js \
+            popup.html \
+            popup.js \
+            popup.css \
+            data/ \
+            icons/ \
+            PRIVACY.md \
+            LICENSE \
+            -x "*.git*" "*.github*" "*.DS_Store*"
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: Release v${{ env.VERSION }}
+          draft: false
+          prerelease: false
+          files: |
+            smart-filler-v${{ env.VERSION }}.zip
+          body: |
+            Automated release for Smart Filler Extension v${{ env.VERSION }}.
+            
+            ### Changes
+            - Build from latest push to master branch.
+            - Ready for upload to Chrome Web Store.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

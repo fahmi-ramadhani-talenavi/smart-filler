@@ -39,6 +39,10 @@
     const blob = new Blob([content], { type });
     return new File([blob], name, { type });
   };
+  const generateUUID = () => "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
@@ -319,7 +323,7 @@
     ["province", /\b(provinsi|province|state)\b/],
     ["city", /\b(kota|kabupaten|city|regency|district)\b/],
     ["district", /\b(kecamatan|sub[\s\-_]?district|area)\b/],
-    ["nik", /\b(nik|ktp|nomor[\s\-_]?induk|nomor[\s\-_]?ktp|national[\s\-_]?id|identity[\s\-_]?number|ssn)\b/],
+    ["nik", /\b(nik|ktp|nomor[\s\-_]?induk|nomor[\s\-_]?ktp|national[\s\-_]?id|identity[\s\-_]?number|ssn|profile[\s\-_]?id|akun[\s\-_]?id|account[\s\-_]?id|user[\s\-_]?id|id[\s\-_]?number)\b/],
     ["taxId", /\b(npwp|tax[\s\-_]?id|tin|vat[\s\-_]?id)\b/],
     ["companyId", /\b(nib|nomor[\s\-_]?induk[\s\-_]?berusaha|registration[\s\-_]?number|akta|perizinan|nomor[\s\-_]?pendirian|nip|employee[\s\-_]?id|nomor[\s\-_]?induk[\s\-_]?pegawai)\b/],
     ["education", /\b(pendidikan|education|degree|pendidik[\s\-_]?terakhir)\b/],
@@ -983,12 +987,34 @@
   };
 
   // =====================================================================
+  // MODAL DETECTION
+  // =====================================================================
+  const findActiveModal = () => {
+    const selectors = [
+      ".p-dialog", ".p-dynamic-dialog", ".p-overlaypanel", ".p-sidebar", // PrimeVue
+      ".v-dialog--active", ".v-overlay--active", // Vuetify
+      ".MuiDialog-root", ".MuiModal-root", // MUI
+      ".ant-modal-content", ".ant-drawer-content", // AntD
+      ".modal.show", ".modal-content", // Bootstrap
+      "[role='dialog'][aria-modal='true']", "[role='alertdialog']" // Generic
+    ];
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      if (el && (el.offsetParent !== null || getComputedStyle(el).display !== "none")) {
+        return el;
+      }
+    }
+    return null;
+  };
+
+  // =====================================================================
   // INPUT COLLECTION (incl. open shadow DOM)
   // =====================================================================
   const collectInputs = () => {
     const sel = "input, textarea, select, [contenteditable='true'], [contenteditable=''], [role='combobox'], .p-dropdown, .p-select, .p-datepicker, .p-calendar";
     const out = new Set();
-    const stack = [document];
+    const modal = findActiveModal();
+    const stack = [modal || document];
     const visited = new Set();
 
     while (stack.length > 0) {
@@ -1051,7 +1077,7 @@
   // MAIN FILL — multi-pass async
   // =====================================================================
 
-  const fillOnce = async (language, data, filledMarker) => {
+  const fillOnce = async (language, data, filledMarker, requestedCustomData) => {
     const all = collectInputs();
     let passFilled = 0;
     const radioGroups = new Map();
@@ -1062,6 +1088,19 @@
       if (window.__smartFillerStopRequested) return passFilled;
       if (filledMarker.has(el)) continue;
       if (!isFillable(el)) continue;
+
+      const sig = collectSignals(el);
+      let valToFill = null;
+      let key = null;
+
+      // 1. Custom override (Label mapping)
+      if (requestedCustomData) {
+        for (const [ckey, cval] of Object.entries(requestedCustomData)) {
+          if (sig.includes(ckey.toLowerCase()) || (el.name && el.name.toLowerCase() === ckey.toLowerCase())) {
+            valToFill = cval; key = "custom"; break;
+          }
+        }
+      }
 
       const t = (el.type || "").toLowerCase();
       if (t === "checkbox") {
@@ -1091,7 +1130,9 @@
         continue;
       }
 
-      let key = detectKey(el);
+      if (!valToFill) {
+        key = detectKey(el);
+      }
       if (!key) {
         const sig = collectSignals(el);
         const semanticMap = {
@@ -1118,7 +1159,6 @@
       }
       if (!key && el.classList.contains("p-datepicker-input")) key = "birthDate";
 
-      let valToFill = null;
       if (!key) {
         const type = (el.type || "").toLowerCase();
         const inputMode = el.getAttribute("inputmode") || "";
@@ -1146,8 +1186,15 @@
           valToFill = data.fullName || data.city || "Data Dummy";
         }
         key = "fallback";
-      } else {
+      } else if (!valToFill) {
         valToFill = data[key];
+      }
+
+      // Special handling for IDs to ensure random UUIDs (only for text-like inputs)
+      if (t !== "file" && (key === "nik" || key === "passport" || key === "ssn" || key === "uuid")) {
+        if (!valToFill || valToFill === "Data Dummy") {
+          valToFill = key === "nik" ? generateUUID().replace(/-/g, "").slice(0, 16) : generateUUID();
+        }
       }
 
       if (valToFill == null) { filledMarker.add(el); continue; }
@@ -1184,7 +1231,8 @@
     return passFilled;
   };
 
-  const fillAll = async (requestedLanguage) => {
+  const fillAll = async (requestedLanguage, requestedCustomData) => {
+    const startTime = Date.now();
     window.__smartFillerStopRequested = false;
     let finalLanguage = requestedLanguage;
 
@@ -1208,13 +1256,20 @@
       chrome.storage.local.set({ preferredLanguage: requestedLanguage });
     }
 
+    let customData = requestedCustomData;
+    if (!customData) {
+      const stored = await chrome.storage.local.get("customData");
+      customData = stored.customData || {};
+    }
+
     const pack = LANGUAGES[finalLanguage] || LANGUAGES.en;
-    const data = pack.generate();
+    const data = { ...pack.generate(), ...customData };
     const filledMarker = new WeakSet();
     let total = 0;
 
-    // Diagnostic: Force fill all file inputs immediately
-    const files = document.querySelectorAll('input[type="file"]');
+    // 2. Initial pass for specific elements (like files)
+    const all = collectInputs();
+    const files = all.filter(el => el.type === "file");
     for (const f of files) {
       const adapter = findAdapter(f);
       if (adapter) {
@@ -1230,7 +1285,7 @@
     // Up to 5 passes — covers wizard steps, lazy-rendered sections, dependent dropdowns.
     for (let pass = 0; pass < 5; pass++) {
       if (window.__smartFillerStopRequested) break;
-      const filledThisPass = await fillOnce(finalLanguage, data, filledMarker);
+      const filledThisPass = await fillOnce(finalLanguage, data, filledMarker, customData);
       total += filledThisPass;
       await waitForDomStable(250, 1200);
       if (filledThisPass === 0) break;
@@ -1239,6 +1294,8 @@
     // 3. Auto-Submit (Experimental)
     // We look for primary buttons after a small delay to let UI settle
     setTimeout(() => {
+      const modal = findActiveModal();
+      const root = modal || document;
       const submitSelectors = [
         "button[type='submit']",
         "button.p-button-primary",
@@ -1247,7 +1304,7 @@
         "input[type='submit']"
       ];
       for (const sel of submitSelectors) {
-        const btn = document.querySelector(sel);
+        const btn = root.querySelector(sel);
         // Only auto-click if it looks like a "Kirim/Submit" button and it's visible
         if (btn && !isHoneypot(btn) && /kirim|submit|daftar|simpan|save|next|selanjutnya/i.test(textOf(btn) || btn.value)) {
           // btn.click(); // Decided to keep it commented or as a setting for safety
@@ -1255,7 +1312,8 @@
       }
     }, 1500);
 
-    return { filled: total, data };
+    const duration = Date.now() - startTime;
+    return { filled: total, data, duration };
   };
 
   const clearAll = () => {
@@ -1317,7 +1375,7 @@
     (async () => {
       try {
         if (msg.action === "fill") {
-          const r = await fillAll(msg.language);
+          const r = await fillAll(msg.language, msg.customData);
           sendResponse({ ok: true, ...r });
         } else if (msg.action === "fill-single") {
           if (lastRightClickedElement) {
@@ -1354,6 +1412,14 @@
   };
 
   chrome.runtime.onMessage.addListener(messageListener);
+
+  document.addEventListener("keydown", (e) => {
+    if (e.altKey && e.shiftKey) {
+      if (e.code === "KeyF" || e.code === "KeyJ") { e.preventDefault(); fillAll(); }
+      else if (e.code === "KeyC" || e.code === "KeyK") { e.preventDefault(); clearAll(); }
+      else if (e.code === "KeyL") { e.preventDefault(); window.__smartFillerStopRequested = true; }
+    }
+  }, true);
 
   // Cleanup for re-injection
   window.__smartFillerCleanup = () => {

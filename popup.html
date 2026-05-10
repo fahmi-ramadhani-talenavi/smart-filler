@@ -9,9 +9,23 @@
 
 <body>
   <header>
-    <h1>Smart Filler</h1>
+    <div class="header-main">
+      <h1>Smart Filler</h1>
+      <button id="toggle-settings" class="icon-btn" title="Settings">⚙️</button>
+    </div>
     <p class="sub" id="sub">Auto-fill any form, framework-aware</p>
   </header>
+
+  <section id="settings-panel" class="settings-panel" hidden>
+    <label class="lbl">Custom Overrides (Label Map)</label>
+    <div id="overrides-list" class="overrides-list">
+      <!-- Rows will be injected here -->
+    </div>
+    <div class="settings-actions">
+      <button id="add-override" class="btn small ghost">+ Add Row</button>
+      <button id="save-settings" class="btn primary small">Save</button>
+    </div>
+  </section>
 
   <section class="language">
     <label class="lbl">Language</label>
@@ -22,18 +36,26 @@
   </section>
 
   <section class="actions">
-    <button id="fill" class="btn primary" type="button">Fill Form</button>
-    <button id="stop" class="btn danger" type="button" hidden>Stop</button>
+    <div class="main-action">
+      <button id="fill" class="btn primary" type="button">Fill Form</button>
+      <button id="stop" class="btn danger" type="button" hidden>Stop</button>
+    </div>
     <button id="clear" class="btn ghost" type="button">Clear</button>
   </section>
 
   <section class="status" id="status" hidden></section>
 
-  <footer>
-    <small>Shortcut: <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> fill · <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> clear</small>
-    <div style="margin-top: 8px; font-size: 10px; color: #4f7cff; font-weight: 500;">
-      by fahmi (lukaririnki26)
+  <section class="shortcuts-guide">
+    <label class="lbl">Shortcuts</label>
+    <div class="shortcut-list">
+      <div class="sc-item"><span id="lbl-sc-fill">Fill</span> <span class="keys"><kbd>Alt</kbd><kbd>Shift</kbd><kbd>F</kbd></span></div>
+      <div class="sc-item"><span id="lbl-sc-clear">Clear</span> <span class="keys"><kbd>Alt</kbd><kbd>Shift</kbd><kbd>C</kbd></span></div>
+      <div class="sc-item"><span id="lbl-sc-stop">Stop</span> <span class="keys"><kbd>Alt</kbd><kbd>Shift</kbd><kbd>L</kbd></span></div>
     </div>
+  </section>
+
+  <footer>
+    <div class="author">by fahmi (lukaririnki26)</div>
   </footer>
 
   <script src="popup.js"></script>
