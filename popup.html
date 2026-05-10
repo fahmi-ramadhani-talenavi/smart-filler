@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Smart Filler</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+
+<body>
+  <header>
+    <h1>Smart Filler</h1>
+    <p class="sub" id="sub">Auto-fill any form, framework-aware</p>
+  </header>
+
+  <section class="language">
+    <label class="lbl">Language</label>
+    <div class="seg" role="radiogroup">
+      <button class="seg-btn" data-language="en" type="button">English</button>
+      <button class="seg-btn" data-language="id" type="button">Indonesia</button>
+    </div>
+  </section>
+
+  <section class="actions">
+    <button id="fill" class="btn primary" type="button">Fill Form</button>
+    <button id="stop" class="btn danger" type="button" hidden>Stop</button>
+    <button id="clear" class="btn ghost" type="button">Clear</button>
+  </section>
+
+  <section class="status" id="status" hidden></section>
+
+  <footer>
+    <small>Shortcut: <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> fill · <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> clear</small>
+    <div style="margin-top: 8px; font-size: 10px; color: #4f7cff; font-weight: 500;">
+      by fahmi (lukaririnki26)
+    </div>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+
+</html>
